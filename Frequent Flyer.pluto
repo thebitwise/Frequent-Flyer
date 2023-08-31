@@ -1,0 +1,94 @@
+--$$\        $$$$$$\  $$\   $$\  $$$$$$\  $$$$$$$$\ 
+--$$ |      $$  __$$\ $$$\  $$ |$$  __$$\ $$  _____|
+--$$ |      $$ /  $$ |$$$$\ $$ |$$ /  \__|$$ |      
+--$$ |      $$$$$$$$ |$$ $$\$$ |$$ |      $$$$$\    
+--$$ |      $$  __$$ |$$ \$$$$ |$$ |      $$  __|   
+--$$ |      $$ |  $$ |$$ |\$$$ |$$ |  $$\ $$ |      
+--$$$$$$$$\ $$ |  $$ |$$ | \$$ |\$$$$$$  |$$$$$$$$\ 
+--\________|\__|  \__|\__|  \__| \______/ \________|
+-- coded by Lance/stonerchrist on Discord
+
+util.require_natives("2944b", "g")
+local root = menu.my_root()
+local car_hdl = 0
+-- vehicle fly handler
+util.create_tick_handler(function()
+    car_hdl = entities.get_user_vehicle_as_handle(false)
+end)
+
+
+local vehicle_fly = false 
+local vehicle_fly_dampen = true
+local v_fly_speed = 50
+util.create_tick_handler(function()
+    if vehicle_fly then 
+        if car_hdl == 0 then 
+            menu.trigger_commands('osfly off')
+            vehicle_fly = false
+        else
+            SET_ENTITY_MAX_SPEED(car_hdl, v_fly_speed)
+            local camera_angs = GET_GAMEPLAY_CAM_ROT(0)
+            if IS_CONTROL_PRESSED(21, 21) then 
+                SET_ENTITY_ROTATION(car_hdl, camera_angs['x'], camera_angs['y'], camera_angs['z'], 0, true)
+            else
+                SET_ENTITY_ROTATION(car_hdl, 0, camera_angs['y'], camera_angs['z'], 0, true)
+            end
+
+            local forward_control = IS_CONTROL_PRESSED(32, 32)
+            local backward_control = IS_CONTROL_PRESSED(33, 33) 
+
+            local car_vel = GET_ENTITY_SPEED_VECTOR(car_hdl, true)
+
+            if not forward_control and not backward_control then 
+                FREEZE_ENTITY_POSITION(car_hdl, true)
+            else 
+                FREEZE_ENTITY_POSITION(car_hdl, false)
+                local car_side_speed = car_vel['x']
+                if math.abs(car_side_speed) > 5 then 
+                    if vehicle_fly_dampen then 
+                        APPLY_FORCE_TO_ENTITY_CENTER_OF_MASS(car_hdl, 0, -car_side_speed, 0, 0, true, true, true, true)
+                    end
+                end
+            end
+
+            if forward_control then
+                APPLY_FORCE_TO_ENTITY_CENTER_OF_MASS(car_hdl, 0, 0, v_fly_speed, 0, true, true, true, true)
+            end
+
+            if backward_control then
+                APPLY_FORCE_TO_ENTITY_CENTER_OF_MASS(car_hdl, 0, 0, -v_fly_speed, 0, true, true, true, true)
+            end
+        end
+    end
+end)
+
+root:toggle('Vehicle fly dampening', {'osflydampen'}, 'Automatically counters sideways forces while flying to increase precision', function(on)
+    vehicle_fly_dampen = on
+end, true)
+
+root:slider('Vehicle fly speed', {"vflyspeed"}, "", 1, 1000, 300, 1, function(val)
+    v_fly_speed = val
+end)
+
+
+root:toggle('Vehicle fly', {'osfly'}, '', function(on)
+    if on and car_ptr == 0 then 
+        menu.trigger_commands('osfly off')
+        return 
+    end
+
+    if not vehicle_fly then 
+        -- start v fly 
+        vehicle_fly = true 
+        SET_VEHICLE_GRAVITY(car_hdl, false)
+    else
+        SET_VEHICLE_GRAVITY(car_hdl, true)
+        FREEZE_ENTITY_POSITION(car_hdl, false)
+        APPLY_FORCE_TO_ENTITY_CENTER_OF_MASS(car_hdl, 0, 0, -0.02, 0, true, true, true, true)
+        -- end v fly
+        vehicle_fly = false 
+    end
+end)
+
+menu.my_root():divider('')
+menu.my_root():hyperlink('Join Discord', 'https://discord.gg/zZ2eEjj88v', '')
